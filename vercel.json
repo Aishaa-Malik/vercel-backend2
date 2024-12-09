@@ -1,0 +1,15 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "api/**/*.js",
+        "use": "@vercel/node"
+      }
+    ],
+    "env": {
+      "MONGODB_URI": "mongodb+srv://aishafaang:LmOXMqZ7YdNdBTPQ@doubtbuddycluster.gayfw.mongodb.net/?retryWrites=true&w=majority&appName=DoubtBuddyCluster",
+      "RAZORPAY_KEY_ID": "rzp_live_5ru2zEaMJjJWQ5",
+      "RAZORPAY_KEY_SECRET": "J1redEJR3l2gmtpZwN8veXei"
+    }
+  }
+  
