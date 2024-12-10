@@ -4,26 +4,37 @@ const router = express.Router();
 
 import cors from "cors";
 
-const corsOptions = {
-  origin: ["http://localhost:3000", "https://your-frontend-domain.vercel.app"],
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+// const corsOptions = {
+//   origin: ["http://localhost:3000", "https://your-frontend-domain.vercel.app"],
+//   methods: ["GET", "POST"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+// };
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID, // Use environment variable
-  key_secret: process.env.RAZORPAY_KEY_SECRET // Use environment variable
+  key_id: "rzp_live_5ru2zEaMJjJWQ5", // Use environment variable
+  key_secret: "J1redEJR3l2gmtpZwN8veXei" // Use environment variable
 });
 
 export default async function handler(req, res) {
-    const corsMiddleware = cors(corsOptions);
+      // Add CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000"); // Allow localhost during development
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+
+  if (req.method === "OPTIONS") {
+    res.status(200).end(); // Preflight request is satisfied
+    return;
+  }
+    
+    //const corsMiddleware = cors(corsOptions);
   
     // Run the CORS middleware
-    await new Promise((resolve, reject) => {
-      corsMiddleware(req, res, (result) =>
-        result instanceof Error ? reject(result) : resolve(result)
-      );
-    });
+    // await new Promise((resolve, reject) => {
+    //   corsMiddleware(req, res, (result) =>
+    //     result instanceof Error ? reject(result) : resolve(result)
+    //   );
+    // });
 
   if (req.method === "POST") {
     const { amount } = req.body;
