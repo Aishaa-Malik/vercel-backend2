@@ -18,7 +18,13 @@ app.get('/', (req, res) => {
   res.send('HealthConnect API is running');
 });
 
-// Start server
-app.listen(config.port, () => {
-  console.log(`Server is running on port ${config.port}`);
-});
+// For Vercel, we export the Express app instead of starting the server directly
+if (process.env.NODE_ENV === 'production') {
+  // Export app for Vercel serverless function
+  module.exports = app;
+} else {
+  // Start server for local development
+  app.listen(config.port, () => {
+    console.log(`Server is running on port ${config.port}`);
+  });
+}
