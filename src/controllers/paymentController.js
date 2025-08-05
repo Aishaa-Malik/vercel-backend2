@@ -100,6 +100,15 @@ exports.verifyPayment = async (req, res) => {
     } else {
       userId = existingUser.id;
     }
+    
+    // Add user to approved_users table
+    await supabase.from('approved_users').upsert([
+      {
+        email: email,
+        role: 'BUSINESS_ADMIN',
+        updated_at: new Date().toISOString()
+      }
+    ], { onConflict: 'email' });
 
     // Set user role as business_admin
     await supabase.from('user_roles').upsert([
