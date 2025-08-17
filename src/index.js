@@ -2,16 +2,23 @@ const express = require('express');
 const cors = require('cors');
 const config = require('./config');
 const paymentRoutes = require('./routes/payment');
+const onboardingRoutes = require('./routes/onboarding');
 
 const app = express();
 
 // Middleware
-app.use(cors());
+// Configure CORS with specific options
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001'], // Allow these origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', paymentRoutes);
+app.use('/api', onboardingRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {
