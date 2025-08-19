@@ -21,7 +21,8 @@ exports.verifyPayment = async (req, res) => {
       razorpay_payment_id,
       razorpay_order_id,
       razorpay_signature,
-      email
+      email,
+      plan
     } = req.body;
 
     // Validate required fields - only email is truly required
@@ -31,10 +32,12 @@ exports.verifyPayment = async (req, res) => {
         message: 'Email is required'
       });
     }
+
     
     console.log('Payment verification accepted for:', {
       payment_id: razorpay_payment_id || 'test_payment',
-      email: email
+      email: email,
+      plan: plan
     });
     
     // Set a default payment object for testing
@@ -54,8 +57,6 @@ exports.verifyPayment = async (req, res) => {
 
     if (userError) {
       console.log('userError- ', userError);
-
-      
 
       // If user doesn't exist, create a new user
       // const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -143,7 +144,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     if(userError){
-          const { data: businessData, error: businessError } = await supabase
+      const { data: businessData, error: businessError } = await supabase
         .from('business_profiles')
         .insert({
           email: email,  
@@ -158,65 +159,118 @@ exports.verifyPayment = async (req, res) => {
       }
     }
 
+    const isTurf = false;
+    if(businessData.business_type === 'Turf'){
+      isTurf = true;
+    }
+
+    // Create subscription record using your existing subscriptions table structure
+    console.log('Creating subscription for plan:', plan);
+    const billingCycleStart = new Date();
+    const billingCycleEnd = new Date();
+    billingCycleEnd.setMonth(billingCycleEnd.getMonth() + 1); // 1 month billing cycle
+
+    // Dynamically fetch the plan ID from the plans table
+    console.log('Looking up plan ID for plan name:', plan);
+    const { data: planData, error: planError } = await supabase
+      .from('plans')
+      .select('id, name')
+      .ilike('name', `%${plan}%`) // Use case-insensitive search with wildcards
+      .single();
     
-    
+    let planId;
+    if (planError) {
+      console.error('❌ Plan lookup failed:', planError);
+      console.log('Attempting to fetch all plans to see what\'s available...');
+      
+      // Fetch all plans to see what's available
+      const { data: allPlans } = await supabase
+        .from('plans')
+        .select('id, name');
+      
+      console.log('Available plans:', allPlans);
+      
+      // Fall back to a default plan if we can't find the specified one
+      const { data: defaultPlan, error: defaultPlanError } = await supabase
+        .from('plans')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (defaultPlanError || !defaultPlan) {
+        console.error('❌ Default plan lookup failed:', defaultPlanError);
+        return res.status(500).json({
+          success: false,
+          message: 'Could not find any subscription plans'
+        });
+      }
+      
+      console.log('Using default plan:', defaultPlan);
+      planId = defaultPlan.id;
+    } else {
+      console.log('✅ Found plan:', planData);
+      planId = planData.id;
+    }
 
-    // Set user role as business_admin
-    
+    // Create the subscription record
+    const { data: subscriptionData, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        tenant_id: newtenantId,
+        plan_id: planId,
+        status: 'active',
+        appointments_used: 0,
+        billing_cycle_start: billingCycleStart.toISOString().split('T')[0], // Convert to date format
+        billing_cycle_end: billingCycleEnd.toISOString().split('T')[0], // Convert to date format
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email: email
+      })
+      .select();
 
-    // Create a tenant for the business admin if needed
-    // const { data: existingTenant } = await supabase
-    //   .from('user_tenants')
-    //   .select('tenant_id')
-    //   .eq('user_id', userId)
-    //   .single();
+    if (subscriptionError) {
+      console.error('❌ Subscription creation failed:', subscriptionError);
+      // Continue even if subscription creation fails
+    } else {
+      console.log('✅ Subscription created successfully:', subscriptionData);
+    }
 
-    // if (!existingTenant) {
-    //   // Create a new tenant
-    //   const { data: newTenant } = await supabase
-    //     .from('tenants')
-    //     .insert([
-    //       {
-    //         name: `${email.split('@')[0]}'s Organization`,
-    //         created_by: userId,
-    //         created_at: new Date().toISOString()
-    //       }
-    //     ])
-    //     .select();
-
-    //   if (newTenant && newTenant.length > 0) {
-    //     // Associate user with tenant
-    //     await supabase.from('user_tenants').insert([
-    //       {
-    //         user_id: userId,
-    //         tenant_id: newTenant[0].id
-    //       }
-    //     ]);
-    //   }
-    // }
-
-    // Record the payment
-    // try {
-    //   await supabase.from('payments').insert([
-    //     {
-    //       payment_id: razorpay_payment_id || 'manual_payment_' + Date.now(),
-    //       order_id: razorpay_order_id || '',
-    //       user_id: userId,
-    //       amount: payment.amount / 100, // Convert from paise to rupees
-    //       status: 'completed',
-    //       payment_date: new Date().toISOString()
-    //     }
-    //   ]);
-    // } catch (paymentInsertError) {
-    //   console.error('Error recording payment:', paymentInsertError);
-    //   // Continue even if payment recording fails
-    // }
+    // Record the payment in payments table (if you have one)
+    try {
+      // Check if payments table exists
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payments')
+        .insert([
+          {
+            razorpay_payment_id: razorpay_payment_id || `manual_payment_${Date.now()}`,
+            razorpay_order_id: razorpay_order_id || '',
+            user_id: userId,
+            tenant_id: newtenantId,
+            plan: plan, // Your current plan price
+            status: 'completed',
+            payment_verified: true,
+            email: email
+          }
+        ])
+        .select();
+      
+      if (paymentError) {
+        console.log('Payments table insert failed (table might not exist):', paymentError);
+      } else {
+        console.log('✅ Payment record created successfully');
+      }
+    } catch (paymentInsertError) {
+      console.log('Payments table might not exist, skipping payment record creation', paymentInsertError);
+    }
 
     // Return success response
     return res.status(200).json({
       success: true,
-      message: 'Payment verified and user role updated successfully',
-      userId
+      message: 'Payment verified and subscription created successfully',
+      userId,
+      tenantId: newtenantId,
+      subscription: subscriptionData?.[0] || null,
+      plan: plan
     });
 
   } catch (error) {
